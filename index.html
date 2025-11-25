@@ -95,6 +95,23 @@
             border-radius: 4px;
         }
         .low .bar-fill { background: #f44336; }
+        .stat.pulse {
+            animation: pulse 0.6s ease-out;
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); box-shadow: 0 0 0 rgba(255, 107, 107, 0); }
+            50% { transform: scale(1.05); box-shadow: 0 0 20px rgba(255, 107, 107, 0.6); }
+            100% { transform: scale(1); box-shadow: 0 0 0 rgba(255, 107, 107, 0); }
+        }
+        #pointsDisplay {
+            background: rgba(255, 235, 238, 0.8);
+            padding: 12px;
+            border-radius: 15px;
+            font-size: 13px;
+            margin: 15px 0;
+            font-weight: 600;
+            color: #ff6b6b;
+        }
         button {
             background: linear-gradient(135deg, #ff9a9e, #ff6b6b);
             color: white;
@@ -180,7 +197,7 @@
     <div class="container">
         <h1>Shawn's Tamagotchi ❤️</h1>
         <p class="subtitle">A little piece of me, waiting for your touch</p>
-        <div id="status">Adult Shawn 💕</div>
+        <div id="status">Shawn</div>
         <div class="clock" id="clock"></div>
         <div id="shawn">
             <canvas id="avatarCanvas"></canvas>
@@ -203,6 +220,7 @@
                 <div class="stat-bar"><div class="bar-fill" id="loveBar"></div></div>
             </div>
         </div>
+        <div id="pointsDisplay">Points: <span id="pointsValue">0</span> / 5 Levels</div>
         <button id="cuddleBtn" onclick="cuddleShawn()">Cuddle 🤗 (+10 Happiness)</button>
         <button id="movieBtn" onclick="watchMovie()">Watch a Movie 🍿 (+20 Happiness)</button>
         <button id="dateBtn" onclick="goOnDate()">Go on a Date 🌹 (+30 Happiness)</button>
@@ -300,7 +318,16 @@
             }
             requestAnimationFrame(animateAvatar);
         }
-        // Game state - All full
+        // Function to get level and title based on points
+        function getLevelAndTitle(points) {
+            points = points || 0; // Ensure points is 0 if undefined
+            if (points < 100) return { level: 1, title: 'Shawn' };
+            if (points < 200) return { level: 2, title: 'Friend Shawn' };
+            if (points < 300) return { level: 3, title: 'Best friend Shawn' };
+            if (points < 400) return { level: 4, title: 'Friends with Benefits' };
+            return { level: 5, title: 'Boyfriend Shawn' };
+        }
+        // Game state - All full, points start at 0
         let gameState = loadState() || {
             stage: 'adult',
             age: 0,
@@ -308,15 +335,17 @@
             happiness: 100,
             energy: 100,
             love: 100,
+            points: 0,
             lastTime: Date.now(),
             poop: false,
             score: 0
         };
-        // Always reset moods to full (hunger=0, others=100) on load
+        // Always reset moods to full (hunger=0, others=100) and ensure points start at 0 if undefined
         gameState.hunger = 0;
         gameState.happiness = 100;
         gameState.energy = 100;
         gameState.love = 100;
+        gameState.points = gameState.points || 0;
         gameState.lastTime = Date.now();
         let decayInterval;
         let clockInterval;
@@ -332,14 +361,16 @@
             document.getElementById('clock').textContent = now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
         }
         function updateVisuals() {
+            const { title } = getLevelAndTitle(gameState.points);
             const status = document.getElementById('status');
-            status.textContent = `Adult Shawn 💕`;
+            status.textContent = title;
             drawPixelAvatar(isSmiling);
             const clamp = (val) => Math.max(0, Math.min(100, val));
             document.getElementById('hungerBar').style.width = `${100 - clamp(gameState.hunger)}%`;
             document.getElementById('happinessBar').style.width = `${clamp(gameState.happiness)}%`;
             document.getElementById('energyBar').style.width = `${clamp(gameState.energy)}%`;
             document.getElementById('loveBar').style.width = `${clamp(gameState.love)}%`;
+            document.getElementById('pointsValue').textContent = gameState.points;
             ['hunger', 'happiness', 'energy', 'love'].forEach(stat => {
                 const bar = document.getElementById(`${stat}Bar`);
                 const barContainer = bar.parentElement.parentElement;
@@ -375,29 +406,44 @@
             saveState();
             updateVisuals();
         }
+        function pulseStat(statName) {
+            const statContainer = document.querySelector(`#${statName}Bar`).parentElement.parentElement;
+            statContainer.classList.add('pulse');
+            setTimeout(() => {
+                statContainer.classList.remove('pulse');
+            }, 600);
+        }
         function cuddleShawn() {
             gameState.happiness = Math.min(100, gameState.happiness + 10);
             gameState.love = Math.min(100, gameState.love + 5);
+            gameState.points += 10; // Add 10 points for cuddle
             // Removed energy decrease
             showMessage("Just holding you close... feels like home 🤗");
             triggerSmile();
             updateVisuals();
+            pulseStat('happiness');
+            pulseStat('love');
             saveState();
         }
         function watchMovie() {
             gameState.happiness = Math.min(100, gameState.happiness + 20);
             gameState.energy = Math.min(100, gameState.energy + 15);
             gameState.love = Math.min(100, gameState.love + 10);
+            gameState.points += 20; // Add 20 points for movie
             // Removed hunger increase
             showMessage("Cuddling under the stars? Perfect night... 🌌💕");
             triggerSmile();
             updateVisuals();
+            pulseStat('happiness');
+            pulseStat('energy');
+            pulseStat('love');
             saveState();
         }
         function goOnDate() {
             // Removed energy check since always full
             gameState.love = Math.min(100, gameState.love + 25);
             gameState.happiness = Math.min(100, gameState.happiness + 30);
+            gameState.points += 30; // Add 30 points for date
             // Removed energy and hunger decreases
             showMessage("Hand in hand, just us... my heart's yours ❤️");
             for (let i = 0; i < 3; i++) {
@@ -412,6 +458,8 @@
             setTimeout(() => document.getElementById('message').textContent = '', 4000);
             triggerSmile();
             updateVisuals();
+            pulseStat('love');
+            pulseStat('happiness');
             saveState();
         }
         // Init
@@ -424,5 +472,4 @@
         updateVisuals();
     </script>
 </body>
-
 </html>
